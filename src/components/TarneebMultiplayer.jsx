@@ -156,22 +156,45 @@ const TarneebMultiplayer = () => {
           suitTricks += cards.filter(c => c.rank === 'A').length;
         }
       } else {
-        // Non-trump suit analysis
+        // Non-trump suit analysis - more realistic assessment
         const aces = cards.filter(c => c.rank === 'A').length;
         const kings = cards.filter(c => c.rank === 'K').length;
+        const queens = cards.filter(c => c.rank === 'Q').length;
+        const jacks = cards.filter(c => c.rank === 'J').length;
         
-        if (cards.length >= 6) {
-          // Long suit - count high cards + some length tricks
-          suitTricks += aces;
-          suitTricks += Math.min(kings, 1); // Max 1 king trick in long suits
-          suitTricks += Math.max(0, cards.length - 7); // Length tricks for 8+ cards
-        } else if (cards.length >= 4) {
-          // Medium suit - count aces and some kings
-          suitTricks += aces;
-          if (aces > 0 && kings > 0) suitTricks += Math.min(kings, 1);
-        } else {
-          // Short suit - only count aces (kings unlikely to win)
-          suitTricks += aces;
+        // Aces almost always win
+        suitTricks += aces;
+        
+        // Kings analysis - much more optimistic
+        if (cards.length >= 5) {
+          // Long suit - kings very likely to win, can force out aces
+          suitTricks += kings;
+          // Queens in long suits with A or K support
+          if ((aces > 0 || kings > 0) && queens > 0) {
+            suitTricks += Math.min(queens, 1);
+          }
+          // Length tricks for very long suits
+          if (cards.length >= 7) suitTricks += Math.max(0, cards.length - 7);
+        } else if (cards.length >= 3) {
+          // Medium suit - kings likely to win if you can hold up
+          suitTricks += Math.min(kings, 1); // Assume at least 1 king wins
+          // Queens with ace or king support
+          if ((aces > 0 || kings > 0) && queens > 0) {
+            suitTricks += Math.min(queens, 1);
+          }
+        } else if (cards.length >= 2) {
+          // Short suit - kings still decent, especially if opponent leads the suit
+          suitTricks += kings * 0.8; // 80% chance kings win in short suits
+        }
+        // Single cards - only aces reliable
+        
+        // Jacks analysis  
+        if (cards.length >= 4 && jacks > 0) {
+          if (aces > 0 || kings > 0) {
+            suitTricks += Math.min(jacks * 0.4, 1); // 40% chance for supported jacks
+          } else {
+            suitTricks += Math.min(jacks * 0.2, 1); // 20% chance for unsupported jacks in medium suits
+          }
         }
       }
       
