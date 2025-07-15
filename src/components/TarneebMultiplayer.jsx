@@ -53,7 +53,17 @@ const TarneebMultiplayer = () => {
   const [gameMode, setGameMode] = useState(null);
   const [aiPlayers, setAiPlayers] = useState([]);
   const [trickResult, setTrickResult] = useState(null); // To show trick winner
+  const [trickResultTimeout, setTrickResultTimeout] = useState(null); // To track timeout for clearing
   const [trickHistory, setTrickHistory] = useState([]); // Store completed tricks with details
+  
+  // Cleanup timeout on unmount or game reset
+  useEffect(() => {
+    return () => {
+      if (trickResultTimeout) {
+        clearTimeout(trickResultTimeout);
+      }
+    };
+  }, [trickResultTimeout]);
   const [subscription, setSubscription] = useState(null); // Real-time subscription
 
   // Initialize connection and cleanup subscriptions
@@ -570,8 +580,8 @@ const TarneebMultiplayer = () => {
           return;
         }
         
-        if (trickResult && currentTrick.length === 0) {
-          console.log('AI Skipping - trick result is showing and no new trick started:', trickResult);
+        if (trickResult) {
+          console.log('AI Skipping - trick result is showing:', trickResult);
           return;
         }
         
@@ -706,10 +716,18 @@ const TarneebMultiplayer = () => {
           console.log('Final Scores - Team 1:', newScores.team1, 'Team 2:', newScores.team2);
         }
       
+      // Clear any existing trick result timeout
+      if (trickResultTimeout) {
+        clearTimeout(trickResultTimeout);
+      }
+      
       // Clear trick result after delay
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         setTrickResult(null);
-      }, 1500); // 1.5 second delay to clear trick result
+        setTrickResultTimeout(null);
+      }, 3000); // 3 second delay to clear trick result
+      
+      setTrickResultTimeout(timeoutId);
       
       // Update game state immediately when trick is complete
       setGameState(prev => ({
@@ -772,6 +790,14 @@ const TarneebMultiplayer = () => {
         hand: sortedHands[0] 
       };
 
+      // Clear any pending trick result display
+      if (trickResultTimeout) {
+        clearTimeout(trickResultTimeout);
+        setTrickResultTimeout(null);
+      }
+      setTrickResult(null);
+      setTrickHistory([]);
+      
       setGameMode('single');
       setCurrentPlayer(humanPlayer);
       setPlayerHand(sortedHands[0]);
@@ -806,6 +832,15 @@ const TarneebMultiplayer = () => {
 
     try {
       setConnectionStatus('creating');
+      
+      // Clear any pending trick result display
+      if (trickResultTimeout) {
+        clearTimeout(trickResultTimeout);
+        setTrickResultTimeout(null);
+      }
+      setTrickResult(null);
+      setTrickHistory([]);
+      
       const gameCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       
       const { game, player, gameState } = await gameService.createGame(playerName, gameCode);
@@ -835,6 +870,14 @@ const TarneebMultiplayer = () => {
 
     try {
       setConnectionStatus('joining');
+      
+      // Clear any pending trick result display
+      if (trickResultTimeout) {
+        clearTimeout(trickResultTimeout);
+        setTrickResultTimeout(null);
+      }
+      setTrickResult(null);
+      setTrickHistory([]);
       
       const { game, player } = await gameService.joinGame(playerName, joinRoomCode);
       
