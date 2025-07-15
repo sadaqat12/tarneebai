@@ -504,8 +504,14 @@ const TarneebMultiplayer = () => {
       } else if (gameState.phase === 'playing') {
         // Guard: Don't play if trick is already complete or result is showing
         const currentTrick = gameState?.game_state?.currentTrick || [];
-        if (currentTrick.length >= 4 || trickResult) {
-          console.log('AI Skipping - trick already complete or result showing');
+        
+        if (currentTrick.length >= 4) {
+          console.log(`AI Skipping - trick already complete with ${currentTrick.length} cards`);
+          return;
+        }
+        
+        if (trickResult) {
+          console.log('AI Skipping - trick result is showing:', trickResult);
           return;
         }
         
@@ -601,10 +607,6 @@ const TarneebMultiplayer = () => {
       newCurrentTrick = [];
       newCurrentPlayer = winner;
       
-      // Clear trick result after delay
-      setTimeout(() => {
-        setTrickResult(null);
-        
       // Add to history immediately
       setTrickHistory(prev => [...prev, trickInfo]);
       
@@ -643,6 +645,10 @@ const TarneebMultiplayer = () => {
           
           console.log('Final Scores - Team 1:', newScores.team1, 'Team 2:', newScores.team2);
         }
+      
+      // Clear trick result after delay
+      setTimeout(() => {
+        setTrickResult(null);
       }, 3000); // 3 second delay to clear trick result
       
       // Update game state immediately when trick is complete
