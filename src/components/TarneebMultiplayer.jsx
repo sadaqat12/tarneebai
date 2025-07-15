@@ -143,17 +143,20 @@ const TarneebMultiplayer = () => {
       let suitTricks = 0;
       
       if (isTrump) {
-        // Trump suit analysis - more aggressive counting
+        // Trump suit analysis - trump beats everything!
+        const highTrumps = cards.filter(c => ['A', 'K', 'Q', 'J'].includes(c.rank)).length;
+        
         if (cards.length >= 5) {
-          // Long trump suit - count top cards + length bonus
-          suitTricks += Math.min(3, cards.filter(c => ['A', 'K', 'Q'].includes(c.rank)).length);
-          suitTricks += Math.max(0, cards.length - 5); // Bonus for length > 5
+          // Long trump suit - very powerful!
+          suitTricks += highTrumps; // Count all high trumps (A, K, Q, J)
+          suitTricks += 1; // Length bonus for 5+ trump (can force out opposing trumps)
+          suitTricks += Math.max(0, cards.length - 6); // Extra bonus for 7+ trumps
         } else if (cards.length >= 3) {
-          // Medium trump suit
-          suitTricks += Math.min(2, cards.filter(c => ['A', 'K'].includes(c.rank)).length);
+          // Medium trump suit - count high trumps
+          suitTricks += Math.min(highTrumps, 2); // Max 2 tricks from medium trump
         } else {
-          // Short trump - only count aces
-          suitTricks += cards.filter(c => c.rank === 'A').length;
+          // Short trump - only count aces and kings
+          suitTricks += cards.filter(c => ['A', 'K'].includes(c.rank)).length;
         }
       } else {
         // Non-trump suit analysis - more realistic assessment
