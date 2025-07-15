@@ -165,36 +165,24 @@ const TarneebMultiplayer = () => {
         // Aces almost always win
         suitTricks += aces;
         
-        // Kings analysis - much more optimistic
-        if (cards.length >= 5) {
-          // Long suit - kings very likely to win, can force out aces
+        // Kings: count if you have 2+ cards in the suit (can force out aces)
+        if (cards.length >= 2) {
           suitTricks += kings;
-          // Queens in long suits with A or K support
-          if ((aces > 0 || kings > 0) && queens > 0) {
-            suitTricks += Math.min(queens, 1);
-          }
-          // Length tricks for very long suits
-          if (cards.length >= 7) suitTricks += Math.max(0, cards.length - 7);
-        } else if (cards.length >= 3) {
-          // Medium suit - kings likely to win if you can hold up
-          suitTricks += Math.min(kings, 1); // Assume at least 1 king wins
-          // Queens with ace or king support
-          if ((aces > 0 || kings > 0) && queens > 0) {
-            suitTricks += Math.min(queens, 1);
-          }
-        } else if (cards.length >= 2) {
-          // Short suit - kings still decent, especially if opponent leads the suit
-          suitTricks += kings * 0.8; // 80% chance kings win in short suits
         }
-        // Single cards - only aces reliable
         
-        // Jacks analysis  
-        if (cards.length >= 4 && jacks > 0) {
-          if (aces > 0 || kings > 0) {
-            suitTricks += Math.min(jacks * 0.4, 1); // 40% chance for supported jacks
-          } else {
-            suitTricks += Math.min(jacks * 0.2, 1); // 20% chance for unsupported jacks in medium suits
-          }
+        // Queens: count if you have 3+ cards in the suit (can force out A, K)
+        if (cards.length >= 3) {
+          suitTricks += queens;
+        }
+        
+        // Jacks: count if you have 4+ cards in the suit (can force out A, K, Q)
+        if (cards.length >= 4) {
+          suitTricks += jacks;
+        }
+        
+        // Length tricks for very long suits (8+ cards)
+        if (cards.length >= 8) {
+          suitTricks += Math.max(0, cards.length - 7);
         }
       }
       
