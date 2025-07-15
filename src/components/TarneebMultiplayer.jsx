@@ -112,66 +112,128 @@ const TarneebMultiplayer = () => {
     }
   };
 
-  // AI Decision Making
+  // AI Decision Making - Realistic Trick Estimation
+  
+  // Estimate how many tricks this hand can realistically win
+  const estimateWinnableTricks = (hand, potentialTrump = null) => {
+    const suitCounts = {};
+    const suitCards = {};
+    
+    // Group cards by suit
+    hand.forEach(card => {
+      if (!suitCards[card.suit]) suitCards[card.suit] = [];
+      suitCards[card.suit].push(card);
+      suitCounts[card.suit] = (suitCounts[card.suit] || 0) + 1;
+    });
+    
+    // Sort each suit's cards by rank (high to low)
+    const rankOrder = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2'];
+    Object.keys(suitCards).forEach(suit => {
+      suitCards[suit].sort((a, b) => rankOrder.indexOf(a.rank) - rankOrder.indexOf(b.rank));
+    });
+    
+    let estimatedTricks = 0;
+    
+    // Analyze each suit for winnable tricks
+    SUITS.forEach(suit => {
+      const cards = suitCards[suit] || [];
+      if (cards.length === 0) return;
+      
+      const isTrump = suit === potentialTrump;
+      let suitTricks = 0;
+      
+      if (isTrump) {
+        // Trump suit analysis - more aggressive counting
+        if (cards.length >= 5) {
+          // Long trump suit - count top cards + length bonus
+          suitTricks += Math.min(3, cards.filter(c => ['A', 'K', 'Q'].includes(c.rank)).length);
+          suitTricks += Math.max(0, cards.length - 5); // Bonus for length > 5
+        } else if (cards.length >= 3) {
+          // Medium trump suit
+          suitTricks += Math.min(2, cards.filter(c => ['A', 'K'].includes(c.rank)).length);
+        } else {
+          // Short trump - only count aces
+          suitTricks += cards.filter(c => c.rank === 'A').length;
+        }
+      } else {
+        // Non-trump suit analysis
+        const aces = cards.filter(c => c.rank === 'A').length;
+        const kings = cards.filter(c => c.rank === 'K').length;
+        
+        if (cards.length >= 6) {
+          // Long suit - count high cards + some length tricks
+          suitTricks += aces;
+          suitTricks += Math.min(kings, 1); // Max 1 king trick in long suits
+          suitTricks += Math.max(0, cards.length - 7); // Length tricks for 8+ cards
+        } else if (cards.length >= 4) {
+          // Medium suit - count aces and some kings
+          suitTricks += aces;
+          if (aces > 0 && kings > 0) suitTricks += Math.min(kings, 1);
+        } else {
+          // Short suit - only count aces (kings unlikely to win)
+          suitTricks += aces;
+        }
+      }
+      
+      estimatedTricks += suitTricks;
+    });
+    
+    // Conservative adjustment - reduce by 15% for uncertainty
+    estimatedTricks = Math.floor(estimatedTricks * 0.85);
+    
+    console.log(`Estimated tricks for ${potentialTrump ? potentialTrump + ' trump' : 'no trump'}: ${estimatedTricks}`);
+    return Math.max(0, Math.min(13, estimatedTricks));
+  };
+  
   const makeAIBid = (aiPlayer) => {
     const hand = aiPlayer.hand;
-    let points = 0;
-    
-    hand.forEach(card => {
-      if (card.rank === 'A') points += 4;
-      else if (card.rank === 'K') points += 3;
-      else if (card.rank === 'Q') points += 2;
-      else if (card.rank === 'J') points += 1;
-    });
-    
-    const suitCounts = {};
-    hand.forEach(card => {
-      suitCounts[card.suit] = (suitCounts[card.suit] || 0) + 1;
-    });
-    
-    const maxSuitCount = Math.max(...Object.values(suitCounts));
-    if (maxSuitCount >= 5) points += 2;
-    if (maxSuitCount >= 6) points += 2;
-    
     const currentBid = gameState?.game_state?.bid?.amount || 0;
     
-    if (points >= 12 && currentBid < 10) return Math.max(10, currentBid + 1);
-    if (points >= 10 && currentBid < 9) return Math.max(9, currentBid + 1);
-    if (points >= 8 && currentBid < 8) return Math.max(8, currentBid + 1);
-    if (points >= 6 && currentBid < 7) return 7;
-    
-    return 0;
-  };
-
-  const makeAITrumpSelection = (aiPlayer) => {
-    const hand = aiPlayer.hand;
-    const suitCounts = {};
-    const suitStrength = {};
-    
-    hand.forEach(card => {
-      suitCounts[card.suit] = (suitCounts[card.suit] || 0) + 1;
-      if (!suitStrength[card.suit]) suitStrength[card.suit] = 0;
-      
-      if (card.rank === 'A') suitStrength[card.suit] += 4;
-      else if (card.rank === 'K') suitStrength[card.suit] += 3;
-      else if (card.rank === 'Q') suitStrength[card.suit] += 2;
-      else if (card.rank === 'J') suitStrength[card.suit] += 1;
-    });
-    
-    let bestSuit = 'spades';
-    let bestScore = 0;
+    // Test each suit as potential trump and find the best
+    let bestTricks = 0;
+    let bestSuit = null;
     
     SUITS.forEach(suit => {
-      const count = suitCounts[suit] || 0;
-      const strength = suitStrength[suit] || 0;
-      const score = count * 2 + strength;
-      
-      if (score > bestScore) {
-        bestScore = score;
+      const tricks = estimateWinnableTricks(hand, suit);
+      if (tricks > bestTricks) {
+        bestTricks = tricks;
         bestSuit = suit;
       }
     });
     
+    // AI strategy: bid 1 more than estimated tricks (as requested)
+    const desiredBid = bestTricks + 1;
+    
+    console.log(`AI analyzing bid: estimated ${bestTricks} tricks with ${bestSuit} trump, wants to bid ${desiredBid}`);
+    
+    // Only bid if we can beat current bid and have reasonable confidence
+    if (desiredBid > currentBid && bestTricks >= 5) {
+      // Make sure bid is valid (7-13 range)
+      const finalBid = Math.max(7, Math.min(13, desiredBid));
+      console.log(`AI bidding: ${finalBid}`);
+      return finalBid;
+    }
+    
+    console.log('AI passing - insufficient tricks or cannot beat current bid');
+    return 0; // Pass
+  };
+
+  const makeAITrumpSelection = (aiPlayer) => {
+    const hand = aiPlayer.hand;
+    
+    // Use the same trick estimation logic as bidding
+    let bestTricks = 0;
+    let bestSuit = 'spades'; // Default fallback
+    
+    SUITS.forEach(suit => {
+      const tricks = estimateWinnableTricks(hand, suit);
+      if (tricks > bestTricks) {
+        bestTricks = tricks;
+        bestSuit = suit;
+      }
+    });
+    
+    console.log(`AI selecting trump: ${bestSuit} (estimated ${bestTricks} tricks)`);
     return bestSuit;
   };
 
