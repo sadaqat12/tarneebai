@@ -570,8 +570,8 @@ const TarneebMultiplayer = () => {
           return;
         }
         
-        if (trickResult) {
-          console.log('AI Skipping - trick result is showing:', trickResult);
+        if (trickResult && currentTrick.length === 0) {
+          console.log('AI Skipping - trick result is showing and no new trick started:', trickResult);
           return;
         }
         
@@ -709,7 +709,7 @@ const TarneebMultiplayer = () => {
       // Clear trick result after delay
       setTimeout(() => {
         setTrickResult(null);
-      }, 3000); // 3 second delay to clear trick result
+      }, 1500); // 1.5 second delay to clear trick result
       
       // Update game state immediately when trick is complete
       setGameState(prev => ({
