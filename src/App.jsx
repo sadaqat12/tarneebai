@@ -1,5 +1,5 @@
 import React from 'react'
-import TarneebMultiplayer from './TarneebMultiplayer'
+import TarneebMultiplayer from './components/TarneebMultiplayer'
 
 function App() {
   return (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Users, Wifi, WifiOff, UserPlus, Play, Trophy } from 'lucide-react';
-import { gameService } from './supabase';
+import { gameService } from '../services/supabase';
 
 // Real-time multiplayer functionality integrated with Supabase
 
