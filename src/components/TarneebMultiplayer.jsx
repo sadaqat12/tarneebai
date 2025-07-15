@@ -189,12 +189,45 @@ const TarneebMultiplayer = () => {
     const hand = aiPlayer.hand;
     const currentBid = gameState?.game_state?.bid?.amount || 0;
     
+    console.log(`\n=== ${aiPlayer.player_name} BIDDING ANALYSIS ===`);
+    console.log(`Current bid to beat: ${currentBid}`);
+    
+    // Display AI's complete hand
+    const handBysuit = {};
+    hand.forEach(card => {
+      if (!handBysuit[card.suit]) handBysuit[card.suit] = [];
+      handBysuit[card.suit].push(card.rank);
+    });
+    
+    console.log(`${aiPlayer.player_name}'s Hand (${hand.length} cards):`);
+    SUITS.forEach(suit => {
+      const cards = handBysuit[suit] || [];
+      const suitSymbol = { hearts: '♥️', diamonds: '♦️', clubs: '♣️', spades: '♠️' }[suit];
+      if (cards.length > 0) {
+        const sortedCards = cards.sort((a, b) => {
+          const ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+          return ranks.indexOf(b) - ranks.indexOf(a); // High to low
+        });
+        console.log(`  ${suitSymbol} ${suit.toUpperCase()}: [${sortedCards.join(', ')}] (${cards.length} cards)`);
+      } else {
+        console.log(`  ${suitSymbol} ${suit.toUpperCase()}: [] (void)`);
+      }
+    });
+    
     // Test each suit as potential trump and find the best
     let bestTricks = 0;
     let bestSuit = null;
+    const suitAnalysis = {};
     
+    console.log(`\nTrump Analysis:`);
     SUITS.forEach(suit => {
       const tricks = estimateWinnableTricks(hand, suit);
+      suitAnalysis[suit] = tricks;
+      const suitCards = handBysuit[suit] || [];
+      const highCards = suitCards.filter(rank => ['A', 'K', 'Q', 'J'].includes(rank));
+      
+      console.log(`  ${suit.toUpperCase()} trump: ${tricks} tricks (${suitCards.length} cards, honors: [${highCards.join(', ') || 'none'}])`);
+      
       if (tricks > bestTricks) {
         bestTricks = tricks;
         bestSuit = suit;
@@ -204,18 +237,31 @@ const TarneebMultiplayer = () => {
     // AI strategy: bid 1 more than estimated tricks (as requested)
     const desiredBid = bestTricks + 1;
     
-    console.log(`AI analyzing bid: estimated ${bestTricks} tricks with ${bestSuit} trump, wants to bid ${desiredBid}`);
+    console.log(`\nBest trump suit: ${bestSuit?.toUpperCase()} (${bestTricks} estimated tricks)`);
+    console.log(`Desired bid: ${bestTricks} tricks + 1 = ${desiredBid}`);
     
     // Only bid if we can beat current bid and have reasonable confidence
     if (desiredBid > currentBid && bestTricks >= 5) {
       // Make sure bid is valid (7-13 range)
       const finalBid = Math.max(7, Math.min(13, desiredBid));
-      console.log(`AI bidding: ${finalBid}`);
+      console.log(`✅ ${aiPlayer.player_name} BIDDING: ${finalBid}`);
+      console.log(`   Reason: Can beat current bid (${currentBid}) and confident with ${bestTricks} tricks`);
+      if (finalBid !== desiredBid) {
+        console.log(`   Note: Adjusted from ${desiredBid} to ${finalBid} (valid range 7-13)`);
+      }
+      console.log(`=== END ${aiPlayer.player_name} ANALYSIS ===\n`);
       return finalBid;
+    } else {
+      console.log(`❌ ${aiPlayer.player_name} PASSING`);
+      if (desiredBid <= currentBid) {
+        console.log(`   Reason: Desired bid ${desiredBid} cannot beat current bid ${currentBid}`);
+      }
+      if (bestTricks < 5) {
+        console.log(`   Reason: Only ${bestTricks} estimated tricks (need 5+ for confidence)`);
+      }
+      console.log(`=== END ${aiPlayer.player_name} ANALYSIS ===\n`);
+      return 0; // Pass
     }
-    
-    console.log('AI passing - insufficient tricks or cannot beat current bid');
-    return 0; // Pass
   };
 
   const makeAITrumpSelection = (aiPlayer) => {
