@@ -440,6 +440,13 @@ const TarneebMultiplayer = () => {
         console.log('AI Trump Decision:', decision);
         setTrump(decision);
       } else if (gameState.phase === 'playing') {
+        // Guard: Don't play if trick is already complete or result is showing
+        const currentTrick = gameState?.game_state?.currentTrick || [];
+        if (currentTrick.length >= 4 || trickResult) {
+          console.log('AI Skipping - trick already complete or result showing');
+          return;
+        }
+        
         console.log('AI Playing Card...');
         const decision = makeAICardPlay(currentPlayerData);
         console.log('AI Card Decision:', decision);
@@ -476,14 +483,16 @@ const TarneebMultiplayer = () => {
     const currentTrick = gameState.game_state?.currentTrick || [];
     const newTrick = [...currentTrick, { card, player: playerPosition }];
     
-    // Immediately update the current trick to show the played card
-    setGameState(prev => ({
-      ...prev,
-      game_state: {
-        ...prev.game_state,
-        currentTrick: newTrick
-      }
-    }));
+    // Only update current trick if it doesn't exceed 4 cards
+    if (newTrick.length <= 4) {
+      setGameState(prev => ({
+        ...prev,
+        game_state: {
+          ...prev.game_state,
+          currentTrick: newTrick
+        }
+      }));
+    }
     
     let newCurrentPlayer = (gameState.current_player % 4) + 1;
     let newTricks = gameState.game_state?.tricks || [];
@@ -522,22 +531,23 @@ const TarneebMultiplayer = () => {
         timestamp: Date.now()
       };
       
-      // Show trick result for 3 seconds before clearing
+      // Show trick result for 3 seconds and immediately clear the current trick
       setTrickResult(trickInfo);
       
-      // Clear trick and continue after delay
+      // Immediately clear the current trick
+      newTricks = [...newTricks, { cards: newTrick, winner }];
+      newCurrentTrick = [];
+      newCurrentPlayer = winner;
+      
+      // Clear trick result after delay
       setTimeout(() => {
         setTrickResult(null);
         
-        newTricks = [...newTricks, { cards: newTrick, winner }];
-        newCurrentTrick = [];
-        newCurrentPlayer = winner;
-        
-        // Add to history
-        setTrickHistory(prev => [...prev, trickInfo]);
-        
-        // Check if all 13 tricks are played
-        if (newTricks.length === 13) {
+      // Add to history immediately
+      setTrickHistory(prev => [...prev, trickInfo]);
+      
+      // Check if all 13 tricks are played
+      if (newTricks.length === 13) {
           newPhase = 'finished';
           console.log('Game Finished! Final tricks:', newTricks.length);
           
@@ -571,19 +581,20 @@ const TarneebMultiplayer = () => {
           
           console.log('Final Scores - Team 1:', newScores.team1, 'Team 2:', newScores.team2);
         }
-        
-        setGameState(prev => ({
-          ...prev,
-          phase: newPhase,
-          current_player: newPhase === 'finished' ? null : newCurrentPlayer,
-          game_state: {
-            ...prev.game_state,
-            tricks: newTricks,
-            currentTrick: newCurrentTrick,
-            scores: newPhase === 'finished' ? newScores : prev.game_state.scores
-          }
-        }));
-      }, 3000); // 3 second delay to show trick result
+      }, 3000); // 3 second delay to clear trick result
+      
+      // Update game state immediately when trick is complete
+      setGameState(prev => ({
+        ...prev,
+        phase: newPhase,
+        current_player: newPhase === 'finished' ? null : newCurrentPlayer,
+        game_state: {
+          ...prev.game_state,
+          tricks: newTricks,
+          currentTrick: newCurrentTrick,
+          scores: newPhase === 'finished' ? newScores : prev.game_state.scores
+        }
+      }));
       
       return; // Don't update state immediately for completed tricks
     }
@@ -1361,66 +1372,7 @@ const TarneebMultiplayer = () => {
           </div>
         )}
 
-        {/* Trick History - Always visible */}
-        <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-medium">Trick History</h3>
-            <div className="text-sm text-gray-600">
-              {trickHistory.length} trick{trickHistory.length !== 1 ? 's' : ''} completed
-            </div>
-          </div>
-          
-          {trickHistory.length === 0 ? (
-            <div className="text-center text-gray-500 py-4">
-              <div className="text-sm">No tricks completed yet</div>
-              <div className="text-xs mt-1">Previous tricks will appear here after each round</div>
-            </div>
-          ) : (
-            <div className="max-h-60 overflow-y-auto space-y-3">
-              {trickHistory.slice().reverse().map((trick, index) => (
-                <div key={trick.timestamp} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-medium text-sm">
-                      Trick {trick.trickNumber}
-                    </span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      gameMode === 'single' && (trick.winner === 1 || trick.winner === 3) ? 
-                      'bg-green-100 text-green-700' : 
-                      gameMode === 'single' && (trick.winner === 2 || trick.winner === 4) ?
-                      'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      Won by {gameMode === 'single' ? 
-                        (trick.winner === 1 ? 'You' : `AI ${trick.winner - 1}`) : 
-                        `Player ${trick.winner}`}
-                    </span>
-                  </div>
-                  
-                  <div className="flex gap-2 mb-2">
-                    {trick.cards.map((play, cardIndex) => {
-                      const isWinning = play.player === trick.winner;
-                      return (
-                        <div key={cardIndex} className="text-center">
-                          <div className={`p-1 rounded ${isWinning ? 'bg-yellow-50 border border-yellow-300' : 'bg-gray-50'}`}>
-                            <Card card={play.card} onClick={() => {}} isPlayable={false} size="small" />
-                          </div>
-                          <div className={`text-xs mt-1 ${isWinning ? 'font-bold text-yellow-600' : 'text-gray-500'}`}>
-                            {gameMode === 'single' ? (play.player === 1 ? 'You' : `AI${play.player - 1}`) : `P${play.player}`}
-                            {isWinning && ' 🏆'}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                  <div className="text-xs text-blue-600 font-medium">
-                    📝 {trick.winReason}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        
 
         {/* Current Trick */}
         {currentTrick.length > 0 && !trickResult && (
